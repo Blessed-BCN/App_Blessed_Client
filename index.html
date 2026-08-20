@@ -1,4 +1,4 @@
-﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.3 | Data: 2026-08-20 -->
+﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.4 | Data: 2026-08-20 -->
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -1449,7 +1449,7 @@ const LANGS = {
 };
 
 // ── Config ──────────────────────────────────────────────────────────────
-const APP_VER="2.2.3", APP_DATE="2026-08-20";
+const APP_VER="2.2.4", APP_DATE="2026-08-20";
 // ⚠️ TEST_MODE: automàtic al port 8446 (staging), o manual via localStorage
 const TEST_MODE = window.location.port === '8446' || location.hostname.includes('staging') || localStorage.getItem('blessed_test_mode') === '1';
 const SUPA_URL = TEST_MODE
@@ -2423,9 +2423,13 @@ async function sendQREmail() {
   btn.textContent = '⏳ Enviant...';
 
   try {
-    // Generar imatge del QR
+    // Generar imatge del QR — s'envia com a adjunt inline (cid), no com a
+    // data: URI al HTML, perquè Gmail i altres clients bloquegen les
+    // imatges data: incrustades directament al cos del missatge.
     const canvas = document.getElementById('qr-canvas');
-    const qrImg = canvas ? `<img src="${canvas.toDataURL('image/png')}" style="width:240px;height:240px;border:4px solid #b8860b;border-radius:8px;" alt="QR">` : '';
+    const qrDataUrl = canvas ? canvas.toDataURL('image/png') : '';
+    const qrBase64 = qrDataUrl.split(',')[1] || '';
+    const qrImg = qrBase64 ? `<img src="cid:qrcode" style="width:240px;height:240px;border:4px solid #b8860b;border-radius:8px;" alt="QR">` : '';
 
     const nomDisplay = [state.nom, state.cognom].filter(Boolean).join(' ') || state.telefon;
     const citaInfo = state.cita
@@ -2435,10 +2439,12 @@ async function sendQREmail() {
     const peu = `<br><br>─────────────────────────────────────────────<br>BLESSED ART TATTOO BCN<br>Carrer de Sardenya, 224, Eixample, 08013 Barcelona<br>Tel: 667 279 582<br>─────────────────────────────────────────────`;
     const body = `Hola ${nomDisplay},<br><br>Aquí tens el teu <b>QR de check-in</b> per a Blessed Art Tattoo BCN:<br><br>${qrImg}${citaInfo}<br><br>Mostra aquest QR al tatuador per iniciar la teva sessió.<br>⚠️ El codi caduca en 8 hores.${peu}`;
 
+    const attachments = qrBase64 ? [{ filename: 'qr.png', content: qrBase64, cid: 'qrcode', contentType: 'image/png' }] : [];
+
     const res = await fetch(`${MAILER_URL}/api/send-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MAILER_KEY || ''}` },
-      body: JSON.stringify({ to: email, toName: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', message: body })
+      body: JSON.stringify({ to: email, toName: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', message: body, attachments })
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
