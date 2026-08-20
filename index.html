@@ -1,4 +1,4 @@
-﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.1 | Data: 2026-07-19 -->
+﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.2 | Data: 2026-08-20 -->
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -1449,7 +1449,7 @@ const LANGS = {
 };
 
 // ── Config ──────────────────────────────────────────────────────────────
-const APP_VER="2.2.1", APP_DATE="2026-07-19";
+const APP_VER="2.2.2", APP_DATE="2026-08-20";
 // ⚠️ TEST_MODE: automàtic al port 8446 (staging), o manual via localStorage
 const TEST_MODE = window.location.port === '8446' || location.hostname.includes('staging') || localStorage.getItem('blessed_test_mode') === '1';
 const SUPA_URL = TEST_MODE
@@ -1793,11 +1793,12 @@ document.getElementById('btn-phone-continue').addEventListener('click', async ()
   try {
     if (!CLAUDE_KEY) {
       try {
-        const opts = await apiFetch(`${SUPA_URL}/rest/v1/opcions?limit=1`, { headers: hdrs() });
-        if (opts && opts[0]) {
-          if (opts[0].claude_api_key) CLAUDE_KEY = opts[0].claude_api_key;
-          if (opts[0].mailer_url) MAILER_URL = opts[0].mailer_url;
-          if (opts[0].mailer_key) MAILER_KEY = opts[0].mailer_key;
+        const opts = await apiFetch(`${SUPA_URL}/rest/v1/opcions?select=id,valors&id=in.(claude_api_key,mailer_url,mailer_key)`, { headers: hdrs() });
+        if (opts && opts.length) {
+          const byId = Object.fromEntries(opts.map(o => [o.id, o.valors]));
+          if (byId.claude_api_key) CLAUDE_KEY = byId.claude_api_key;
+          if (byId.mailer_url) MAILER_URL = byId.mailer_url;
+          if (byId.mailer_key) MAILER_KEY = byId.mailer_key;
         }
       } catch (_) {}
     }
