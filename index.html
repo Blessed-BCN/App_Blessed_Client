@@ -1,4 +1,4 @@
-﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.2 | Data: 2026-08-20 -->
+﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.3 | Data: 2026-08-20 -->
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -1449,7 +1449,7 @@ const LANGS = {
 };
 
 // ── Config ──────────────────────────────────────────────────────────────
-const APP_VER="2.2.2", APP_DATE="2026-08-20";
+const APP_VER="2.2.3", APP_DATE="2026-08-20";
 // ⚠️ TEST_MODE: automàtic al port 8446 (staging), o manual via localStorage
 const TEST_MODE = window.location.port === '8446' || location.hostname.includes('staging') || localStorage.getItem('blessed_test_mode') === '1';
 const SUPA_URL = TEST_MODE
@@ -2435,11 +2435,15 @@ async function sendQREmail() {
     const peu = `<br><br>─────────────────────────────────────────────<br>BLESSED ART TATTOO BCN<br>Carrer de Sardenya, 224, Eixample, 08013 Barcelona<br>Tel: 667 279 582<br>─────────────────────────────────────────────`;
     const body = `Hola ${nomDisplay},<br><br>Aquí tens el teu <b>QR de check-in</b> per a Blessed Art Tattoo BCN:<br><br>${qrImg}${citaInfo}<br><br>Mostra aquest QR al tatuador per iniciar la teva sessió.<br>⚠️ El codi caduca en 8 hores.${peu}`;
 
-    await fetch(MAILER_URL, {
+    const res = await fetch(`${MAILER_URL}/api/send-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': MAILER_KEY },
-      body: JSON.stringify({ to: email, nom: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', body })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MAILER_KEY || ''}` },
+      body: JSON.stringify({ to: email, toName: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', message: body })
     });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `Error ${res.status}`);
+    }
 
     btn.textContent = '✓ Enviat!';
     btn.style.borderColor = '#4ade80';
