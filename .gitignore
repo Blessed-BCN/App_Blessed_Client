@@ -1,0 +1,15 @@
+# Backups locals amb versions antigues
+backs/
+
+# Sessions/config local de Claude Code
+.claude/
+
+# Paquet de desplegament generat (es regenera sempre que cal, no cal versionar-lo)
+deploy.zip
+
+# Documentació de negoci — aniran al repositori privat (Fase 6, punt 2)
+CLAUDE.md
+
+# Sistema
+.DS_Store
+Thumbs.db
