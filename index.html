@@ -1,4 +1,4 @@
-﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.2.4 | Data: 2026-08-20 -->
+﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.3.0 | Data: 2026-08-21 -->
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -1449,7 +1449,7 @@ const LANGS = {
 };
 
 // ── Config ──────────────────────────────────────────────────────────────
-const APP_VER="2.2.4", APP_DATE="2026-08-20";
+const APP_VER="2.3.0", APP_DATE="2026-08-21";
 // ⚠️ TEST_MODE: automàtic al port 8446 (staging), o manual via localStorage
 const TEST_MODE = window.location.port === '8446' || location.hostname.includes('staging') || localStorage.getItem('blessed_test_mode') === '1';
 const SUPA_URL = TEST_MODE
@@ -1463,7 +1463,7 @@ let MAILER_URL = '';
 let MAILER_KEY = '';
 const TATUADOR_URL = TEST_MODE
   ? 'https://jlpdespatx.myqnapcloud.com:8446/tatuador/'
-  : 'https://jlpdespatx.myqnapcloud.com:8444/tatuador/';
+  : 'https://blessed-bcn.github.io/App_Blessed_Tatuador/';
 
 // ── State ────────────────────────────────────────────────────────────────
 let state = {
