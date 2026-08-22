@@ -1,4 +1,4 @@
-﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.3.0 | Data: 2026-08-21 -->
+﻿<!-- Blessed Art Tattoo BCN | App Client | Versió 2.4.0 | Data: 2026-08-22 -->
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -1449,7 +1449,7 @@ const LANGS = {
 };
 
 // ── Config ──────────────────────────────────────────────────────────────
-const APP_VER="2.3.0", APP_DATE="2026-08-21";
+const APP_VER="2.4.0", APP_DATE="2026-08-22";
 // ⚠️ TEST_MODE: automàtic al port 8446 (staging), o manual via localStorage
 const TEST_MODE = window.location.port === '8446' || location.hostname.includes('staging') || localStorage.getItem('blessed_test_mode') === '1';
 const SUPA_URL = TEST_MODE
@@ -1458,9 +1458,13 @@ const SUPA_URL = TEST_MODE
 const SUPA_KEY = TEST_MODE
   ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d2dlZ3Bkbm50Y3dlenlhZnFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODY3NjgsImV4cCI6MjA5Mjk2Mjc2OH0.qK9_A1tedSLLZxNadPggF3prmThnsIbwt27suMVn8Sw'
   : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5bmRoc29jbmt6Ym5ubHdzaHVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NzMyNDcsImV4cCI6MjA5MTE0OTI0N30.wco-pbB7W_WRjECf6sBQsMtQ-NbVkamuF6HCkA67ZY0';
-let CLAUDE_KEY = '';
 let MAILER_URL = '';
-let MAILER_KEY = '';
+// Nota de seguretat (2026-08-22): abans hi havia CLAUDE_KEY i MAILER_KEY
+// aquí, carregades des de `opcions` i enviades directament des del navegador
+// — visibles a qualsevol client que inspeccionés el tràfic. Ara la validació
+// de documents i l'enviament del QR passen per endpoints propis de
+// blessed-upload (/api/validate-document, /api/send-client-email) que no
+// requereixen cap secret al costat del client.
 const TATUADOR_URL = TEST_MODE
   ? 'https://jlpdespatx.myqnapcloud.com:8446/tatuador/'
   : 'https://blessed-bcn.github.io/App_Blessed_Tatuador/';
@@ -1791,15 +1795,10 @@ document.getElementById('btn-phone-continue').addEventListener('click', async ()
   showLoading('Buscant les teves dades...');
 
   try {
-    if (!CLAUDE_KEY) {
+    if (!MAILER_URL) {
       try {
-        const opts = await apiFetch(`${SUPA_URL}/rest/v1/opcions?select=id,valors&id=in.(claude_api_key,mailer_url,mailer_key)`, { headers: hdrs() });
-        if (opts && opts.length) {
-          const byId = Object.fromEntries(opts.map(o => [o.id, o.valors]));
-          if (byId.claude_api_key) CLAUDE_KEY = byId.claude_api_key;
-          if (byId.mailer_url) MAILER_URL = byId.mailer_url;
-          if (byId.mailer_key) MAILER_KEY = byId.mailer_key;
-        }
+        const opts = await apiFetch(`${SUPA_URL}/rest/v1/opcions?select=id,valors&id=eq.mailer_url`, { headers: hdrs() });
+        if (opts && opts.length && opts[0].valors) MAILER_URL = opts[0].valors;
       } catch (_) {}
     }
     const [clients, cites, bons] = await Promise.all([
@@ -2423,12 +2422,17 @@ async function sendQREmail() {
   btn.textContent = '⏳ Enviant...';
 
   try {
-    // Generar imatge del QR — s'envia com a adjunt inline (cid), no com a
-    // data: URI al HTML, perquè Gmail i altres clients bloquegen les
-    // imatges data: incrustades directament al cos del missatge.
-    const canvas = document.getElementById('qr-canvas');
-    const qrDataUrl = canvas ? canvas.toDataURL('image/png') : '';
-    const qrBase64 = qrDataUrl.split(',')[1] || '';
+    // Descarregar la mateixa imatge QR que es mostra a pantalla (qr-img,
+    // servida per api.qrserver.com) i convertir-la a base64 — s'envia com a
+    // adjunt inline (cid), no com a data: URI al HTML, perquè Gmail i altres
+    // clients bloquegen les imatges data: incrustades directament al cos del missatge.
+    let qrBase64 = '';
+    try {
+      const qrResp = await fetch(document.getElementById('qr-img').src);
+      const qrBlob = await qrResp.blob();
+      const qrDataUrl = await blobToBase64(qrBlob);
+      qrBase64 = qrDataUrl.split(',')[1] || '';
+    } catch (_) {}
     const qrImg = qrBase64 ? `<img src="cid:qrcode" style="width:240px;height:240px;border:4px solid #b8860b;border-radius:8px;" alt="QR">` : '';
 
     const nomDisplay = [state.nom, state.cognom].filter(Boolean).join(' ') || state.telefon;
@@ -2441,10 +2445,10 @@ async function sendQREmail() {
 
     const attachments = qrBase64 ? [{ filename: 'qr.png', content: qrBase64, cid: 'qrcode', contentType: 'image/png' }] : [];
 
-    const res = await fetch(`${MAILER_URL}/api/send-email`, {
+    const res = await fetch(`${MAILER_URL}/api/send-client-email`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${MAILER_KEY || ''}` },
-      body: JSON.stringify({ to: email, toName: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', message: body, attachments })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: state.token, to: email, toName: nomDisplay, subject: 'El teu QR de check-in — Blessed Art Tattoo BCN', message: body, attachments })
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
@@ -2511,7 +2515,7 @@ async function compressImage(file) {
 
 // Returns { isDoc: bool, expired: bool, expiryDate: string|null }
 async function validateDocPhoto(blob) {
-  if (!CLAUDE_KEY) return { isDoc: true, expired: false, expiryDate: null };
+  if (!MAILER_URL) return { isDoc: true, expired: false, expiryDate: null };
   try {
     const b64 = await new Promise((res, rej) => {
       const r = new FileReader();
@@ -2519,37 +2523,16 @@ async function validateDocPhoto(blob) {
       r.onerror = rej;
       r.readAsDataURL(blob);
     });
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    // Proxy propi (blessed-upload) — la clau d'Anthropic viu només al servidor,
+    // mai al navegador del client (fix 2026-08-22).
+    const resp = await fetch(`${MAILER_URL}/api/validate-document`, {
       method: 'POST',
-      headers: {
-        'x-api-key': CLAUDE_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 60,
-        messages: [{
-          role: 'user',
-          content: [{
-            type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
-          }, {
-            type: 'text',
-            text: 'Analyze this image. Reply ONLY in this exact format (3 lines):\nIS_DOC: YES or NO (is this a government-issued ID, passport, NIE, residence permit or driver license?)\nEXPIRED: YES, NO or UNKNOWN (is the expiry date shown and already past today?)\nEXPIRY_DATE: DD/MM/YYYY or UNKNOWN'
-          }]
-        }]
-      })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ imageBase64: b64 })
     });
     if (!resp.ok) return { isDoc: true, expired: false, expiryDate: null };
     const data = await resp.json();
-    const text = (data.content?.[0]?.text || '').trim();
-    const isDoc = /IS_DOC:\s*YES/i.test(text);
-    const expired = /EXPIRED:\s*YES/i.test(text);
-    const expiryMatch = text.match(/EXPIRY_DATE:\s*(\d{2}\/\d{2}\/\d{4})/i);
-    const expiryDate = expiryMatch ? expiryMatch[1] : null;
-    return { isDoc, expired, expiryDate };
+    return { isDoc: data.isDoc !== false, expired: !!data.expired, expiryDate: data.expiryDate || null };
   } catch (_) { return { isDoc: true, expired: false, expiryDate: null }; }
 }
 

@@ -1,4 +1,4 @@
-const CACHE = 'blessed-client-v2.3.0';
+const CACHE = 'blessed-client-v2.4.0';
 const OFFLINE = ['./index.html'];
 
 self.addEventListener('install', e => {
